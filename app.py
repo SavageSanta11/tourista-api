@@ -101,10 +101,10 @@ def remove_topmost_place(phone_number):
 
     # Remove the topmost element from the places array
     if 'places' in user and isinstance(user['places'], list) and len(user['places']) > 0:
-        user['places'].pop(0)  # Remove the first element
+        topmost_place = user['places'].pop(0)  # Remove the first element
         # Update user data in MongoDB
         collection.update_one({"phone_number": phone_number}, {"$set": user})
-        return jsonify({"message": "Topmost place removed successfully"}), 200
+        return jsonify({"place": topmost_place}), 200
     else:
         return jsonify({"message": "No places found for the user or places list is empty"}), 400
 
