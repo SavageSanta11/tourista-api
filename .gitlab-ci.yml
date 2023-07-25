@@ -34,6 +34,17 @@ unit-test-job:
   script:
     - make venv && make test
 
+sonarqube:
+  stage: Sonar
+  image: sonarsource/sonar-scanner-cli
+  tags:
+    - build
+    - deploy
+  allow_failure: false 
+  script:
+    - sonar-scanner -Dsonar.projectName="${CI_PROJECT_NAME}-${CI_COMMIT_REF_SLUG}" -Dsonar.projectKey="${CI_PROJECT_NAME}-${CI_COMMIT_REF_SLUG}"
+
+
 lint-test-job:
   #image: python:3.11-bookworm
   stage: test
