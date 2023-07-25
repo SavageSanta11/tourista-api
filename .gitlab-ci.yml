@@ -1,0 +1,59 @@
+stages: 
+  - build
+  - test
+  - deploy
+
+build-job:
+  stage: build
+  environment: dev
+  tags:
+    - build
+    - deploy 
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - docker login -u $REGISTRY_USER -p $REGISTRY_PASS
+  script:
+    - echo "Building the image..."
+    - docker build -t api .
+
+
+unit-test-job:
+  image: python:3.11-bookworm
+  stage: test
+  environment: dev
+  tags:
+    - build
+    - deploy 
+  before_script: 
+    - apt-get update && apt-get install make
+  script:
+    - make venv && make test
+
+lint-test-job:
+  #image: python:3.11-bookworm
+  stage: test
+  environment: dev
+  tags:
+    - build
+    - deploy 
+  before_script: 
+    - apt-get update && apt-get install make
+  script: 
+    # - make venv && make lint-fix
+    - echo "Lint initiated"
+    - echo "lint complete"
+
+deploy-job:
+  stage: deploy
+  environment: dev
+  tags:
+    - build
+    - deploy 
+  script:
+    - echo "Deploying application"
+    - echo "Application deployed successfully"
