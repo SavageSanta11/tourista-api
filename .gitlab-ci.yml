@@ -22,17 +22,17 @@ stages:
 #     - docker build -t api .
 
 
-# unit-test-job:
-#   image: python:3.11-bookworm
-#   stage: test
-#   environment: dev
-#   tags:
-#     - build
-#     - deploy 
-#   before_script: 
-#     - apt-get update && apt-get install make
-#   script:
-#     - make venv && make test
+unit-test-job:
+  image: python:3.11-bookworm
+  stage: test
+  environment: dev
+  tags:
+    - build
+    - deploy 
+  before_script: 
+    - apt-get update && apt-get install make
+  script:
+    - make venv && make test
 
 
 sonarqube-check:
