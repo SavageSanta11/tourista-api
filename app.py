@@ -24,7 +24,13 @@ update_user_location_metric = Counter('update_user_location', 'Update User Locat
 UPDATE_LOCATION_REQUEST_TIME = Summary('update_user_location_seconds', 'Time spent in GET user location')
 
 remove_topmost_place_metric = Counter('remove_topmost_place', 'Remove Topmost Place', ['phone_no'])
-REMOVE_PLACES_REQUEST_TIME = Summary('remove_places_seconds', 'Time spent in REMOVE user places')
+REMOVE_PLACES_REQUEST_TIME = Summary('remove_places_seconds', 'Time spent in REMOVE topmost user place')
+graphs['remove_topmost_place_metric'] = remove_topmost_place_metric
+
+remove_specific_place_metric = Counter('remove_specific_place', 'Remove a Specific Place', ['phone_no'])
+REMOVE__SPEC_PLACE_REQUEST_TIME = Summary('remove_specific_place_seconds', 'Time spent in REMOVE specific user place')
+graphs['remove_specific_place_metric'] = remove_specific_place_metric
+
 
 # root route
 @app.route('/')
@@ -141,6 +147,42 @@ def remove_topmost_place(phone_number):
     else:
         remove_topmost_place_metric.labels(phone_no=phone_number).inc()
         return jsonify({"message": "No places found for the user or places list is empty"}), 400
+
+
+@app.route('/api/users/<phone_number>/places/remove/<place_name>', methods=['PATCH'])
+@REMOVE__SPEC_PLACE_REQUEST_TIME.time()
+def remove_place_by_name(phone_number, place_name):
+    # Retrieve existing user data from MongoDB
+    user = collection.find_one({"phone_number": phone_number})
+    if not user:
+        remove_specific_place_metric.labels(phone_no=phone_number).inc()
+        graphs['remove_specific_place_metric'] = remove_specific_place_metric
+        return jsonify({"message": "User not found"}), 404
+
+    # Check if the user has any places
+    if 'places' not in user or not isinstance(user['places'], list) or len(user['places']) == 0:
+        remove_specific_place_metric.labels(phone_no=phone_number).inc()
+        graphs['remove_specific_place_metric'] = remove_specific_place_metric
+        return jsonify({"message": "No places found for the user or places list is empty"}), 400
+
+    # Find and remove the place from the user's places list based on the name
+    found_place = None
+    for place in user['places']:
+        if place.get('title') == place_name:
+            found_place = place
+            user['places'].remove(place)
+            break
+
+    if found_place is None:
+        remove_specific_place_metric.labels(phone_no=phone_number).inc()
+        graphs['remove_specific_place_metric'] = remove_specific_place_metric
+        return jsonify({"message": f"Place with name '{place_name}' not found in the user's places list"}), 404
+
+    # Update user data in MongoDB
+    collection.update_one({"phone_number": phone_number}, {"$set": user})
+    remove_specific_place_metric.labels(phone_no=phone_number).inc()
+    graphs['remove_specific_place_metric'] = remove_specific_place_metric
+    return jsonify({"message": f"Place '{place_name}' removed successfully"}), 200
 
 @app.route('/metrics')
 def metrics():
