@@ -229,6 +229,40 @@ def remove_place_by_name(phone_number, place_name):
     graphs['remove_specific_place_metric'] = remove_specific_place_metric
     return jsonify({"message": f"Place '{place_name}' removed successfully"}), 200
 
+@app.route('/api/users/<phone_number>/interest', methods=['GET'])
+def get_user_interest(phone_number):
+    # Retrieve existing user data from MongoDB
+    user = collection.find_one({"phone_number": phone_number})
+    if user and 'interest' in user and isinstance(user['interest'], str):
+        return jsonify({"interest": user['interest']}), 200
+    else:
+        return jsonify({"message": "User not found or interest not available"}), 404
+
+@app.route('/api/users/<phone_number>/interest', methods=['POST'])
+def store_user_interest(phone_number):
+    data = request.get_json()
+    if 'interest' in data and isinstance(data['interest'], str):
+        # Retrieve existing user data from MongoDB
+        user = collection.find_one({"phone_number": phone_number})
+        if not user:
+            # If user does not exist, create a new user document with the interest
+            new_user = {
+                "phone_number": phone_number,
+                "interest": data['interest']
+            }
+            collection.insert_one(new_user)
+            return jsonify({"message": "New user created successfully"}), 200
+        else:
+            # If user exists, update the user's interest with the new interest
+            user['interest'] = data['interest']
+            # Update user data in MongoDB
+            collection.update_one({"phone_number": phone_number}, {"$set": user})
+            return jsonify({"message": "Interest added successfully"}), 200
+    else:
+        return jsonify({"message": "Invalid data"}), 400
+    
+
+
 
 @app.route("/metrics")
 def requests_count():
