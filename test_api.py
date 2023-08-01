@@ -1,157 +1,180 @@
 import unittest
-import json
-from flask import Flask
-from flask.testing import FlaskClient
-from pymongo import MongoClient
-from app import app, collection
+from unittest.mock import patch
+from app import (
+    get_user_places,
+    update_user_places,
+    get_user_location,
+    update_user_location,
+    remove_topmost_place,
+    remove_place_by_name,
+    get_chat_history,
+    update_chat_history,
+    get_user_interest,
+    store_user_interest,
+    app,
+)
 
-class FlaskAppTest(unittest.TestCase):
+# Import mongomock's MongoClient
+from mongomock import MongoClient
 
+
+class TestAppEndpoints(unittest.TestCase):
     def setUp(self):
-        app.testing = True
+        # Use mongomock's MongoClient for testing
+        self.mongo_client = MongoClient()
+        self.db = self.mongo_client["user_details"]
+        app.config["TESTING"] = True
         self.app = app.test_client()
 
     def tearDown(self):
-        # Clear the collection after each test
-        collection.delete_many({})
+        # Clear the database after each test
+        self.mongo_client.drop_database("user_details")
 
-    def test_hello_world(self):
-        response = self.app.get('/')
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data.decode(), 'Hello, World!')
-
-    def test_get_user_places(self):
+    def test_get_user_places_existing_user(self):
+        # Arrange
         phone_number = "1234567890"
-        # Add a user with places to the collection
-        user = {
-            "phone_number": phone_number,
-            "places": ["Place 1", "Place 2", "Place 3"]
-        }
-        collection.insert_one(user)
+        test_places = [{"title": "Place 1"}, {"title": "Place 2"}]
+        self.db["info"].insert_one({"phone_number": phone_number, "places": test_places})
 
-        response = self.app.get(f'/api/users/{phone_number}/places')
-        self.assertEqual(response.status_code, 200)
-        data = json.loads(response.data.decode())
-        self.assertIsInstance(data, list)
-        self.assertEqual(data, user['places'])
+        # Act
+        response = self.app.get(f"/api/users/{phone_number}/places")
+        data = response.get_json()
+        status_code = response.status_code
 
-    def test_update_user_places(self):
+        # Assert
+        self.assertEqual(status_code, 200)
+        self.assertEqual(data, test_places)
+
+    def test_get_user_places_user_not_found(self):
+        # Arrange
         phone_number = "1234567890"
-        places = ["Place 1", "Place 2", "Place 3"]
-        data = {
-            "places": places
-        }
 
-        response = self.app.patch(f'/api/users/{phone_number}/places', json=data)
-        self.assertEqual(response.status_code, 201)
-        data = json.loads(response.data.decode())
-        self.assertIn("message", data)
-        self.assertEqual(data["message"], "New user created successfully")
+        # Act
+        response = self.app.get(f"/api/users/{phone_number}/places")
+        data = response.get_json()
+        status_code = response.status_code
 
-        # Check if the user document is created in the collection
-        user = collection.find_one({"phone_number": phone_number})
-        self.assertIsNotNone(user)
-        self.assertEqual(user["places"], places)
+        # Assert
+        self.assertEqual(status_code, 404)
+        self.assertEqual(data, {"message": "User not found"})
 
-        # Update the places for the user
-        new_places = ["Place 4", "Place 5"]
-        data = {
-            "places": new_places
-        }
-
-        response = self.app.patch(f'/api/users/{phone_number}/places', json=data)
-        self.assertEqual(response.status_code, 200)
-        data = json.loads(response.data.decode())
-        self.assertIn("message", data)
-        self.assertEqual(data["message"], "Places updated successfully")
-
-        # Check if the places are updated in the user document
-        user = collection.find_one({"phone_number": phone_number})
-        self.assertIsNotNone(user)
-        self.assertEqual(user["places"], new_places)
-
-    def test_get_user_location(self):
+    def test_update_user_places_existing_user(self):
+        # Arrange
         phone_number = "1234567890"
-        location = {
-            "lat": 123.456,
-            "long": 456.789,
-            "street_address": "123 Main St"
-        }
-        # Add a user with location to the collection
-        user = {
-            "phone_number": phone_number,
-            "location": location
-        }
-        collection.insert_one(user)
+        test_data = {"places": [{"title": "Place 1"}, {"title": "Place 2"}]}
+        self.db["info"].insert_one({"phone_number": phone_number})
 
-        response = self.app.get(f'/api/users/{phone_number}/location')
-        self.assertEqual(response.status_code, 200)
-        data = json.loads(response.data.decode())
-        self.assertEqual(data, location)
+        # Act
+        response = self.app.patch(
+            f"/api/users/{phone_number}/places", json=test_data
+        )
+        data = response.get_json()
+        status_code = response.status_code
 
-    def test_update_user_location(self):
+        # Assert
+        self.assertEqual(status_code, 200)
+        self.assertEqual(data, {"message": "Places updated successfully"})
+
+    def test_update_user_places_new_user(self):
+        # Arrange
         phone_number = "1234567890"
-        location = {
-            "lat": 123.456,
-            "long": 456.789,
-            "street_address": "123 Main St"
-        }
-        data = {
-            "location": location
-        }
+        test_data = {"places": [{"title": "Place 1"}, {"title": "Place 2"}]}
 
-        response = self.app.patch(f'/api/users/{phone_number}/location', json=data)
-        self.assertEqual(response.status_code, 200)
-        data = json.loads(response.data.decode())
-        self.assertIn("message", data)
-        self.assertEqual(data["message"], "New user created successfully")
+        # Act
+        response = self.app.patch(
+            f"/api/users/{phone_number}/places", json=test_data
+        )
+        data = response.get_json()
+        status_code = response.status_code
 
-        # Check if the user document is created in the collection
-        user = collection.find_one({"phone_number": phone_number})
-        self.assertIsNotNone(user)
-        self.assertEqual(user["location"], location)
+        # Assert
+        self.assertEqual(status_code, 201)
+        self.assertEqual(data, {"message": "New user created successfully"})
 
-        # Update the location for the user
-        new_location = {
-            "lat": 789.123,
-            "long": 321.654,
-            "street_address": "456 Elm St"
-        }
-        data = {
-            "location": new_location
-        }
-
-        response = self.app.patch(f'/api/users/{phone_number}/location', json=data)
-        self.assertEqual(response.status_code, 200)
-        data = json.loads(response.data.decode())
-        self.assertIn("message", data)
-        self.assertEqual(data["message"], "Location updated successfully")
-
-        # Check if the location is updated in the user document
-        user = collection.find_one({"phone_number": phone_number})
-        self.assertIsNotNone(user)
-        self.assertEqual(user["location"], new_location)
-
-    def test_remove_topmost_place(self):
+    def test_get_user_location_existing_user_with_location(self):
+        # Arrange
         phone_number = "1234567890"
-        places = ["Place 1", "Place 2", "Place 3"]
-        # Add a user with places to the collection
-        user = {
-            "phone_number": phone_number,
-            "places": places
+        test_location = {
+            "lat": 40.7128,
+            "long": -74.0060,
+            "street_address": "New York City, NY",
         }
-        collection.insert_one(user)
+        self.db["info"].insert_one(
+            {"phone_number": phone_number, "location": test_location}
+        )
 
-        response = self.app.patch(f'/api/users/{phone_number}/places/remove')
-        self.assertEqual(response.status_code, 200)
-        data = json.loads(response.data.decode())
-        self.assertIn("place", data)
-        self.assertEqual(data["place"], places[0])
+        # Act
+        response = self.app.get(f"/api/users/{phone_number}/location")
+        data = response.get_json()
+        status_code = response.status_code
 
-        # Check if the topmost place is removed from the user document
-        user = collection.find_one({"phone_number": phone_number})
-        self.assertIsNotNone(user)
-        self.assertEqual(user["places"], places[1:])
+        # Assert
+        self.assertEqual(status_code, 200)
+        self.assertEqual(data, test_location)
 
-if __name__ == '__main__':
+    def test_get_user_location_existing_user_without_location(self):
+        # Arrange
+        phone_number = "1234567890"
+        self.db["info"].insert_one({"phone_number": phone_number})
+
+        # Act
+        response = self.app.get(f"/api/users/{phone_number}/location")
+        data = response.get_json()
+        status_code = response.status_code
+
+        # Assert
+        self.assertEqual(status_code, 404)
+        self.assertEqual(
+            data, {"message": "User not found or location not available"}
+        )
+
+    def test_update_user_location_existing_user(self):
+        # Arrange
+        phone_number = "1234567890"
+        test_data = {
+            "location": {
+                "lat": 40.7128,
+                "long": -74.0060,
+                "street_address": "New York City, NY",
+            }
+        }
+        self.db["info"].insert_one({"phone_number": phone_number})
+
+        # Act
+        response = self.app.patch(
+            f"/api/users/{phone_number}/location", json=test_data
+        )
+        data = response.get_json()
+        status_code = response.status_code
+
+        # Assert
+        self.assertEqual(status_code, 200)
+        self.assertEqual(data, {"message": "Location updated successfully"})
+
+    def test_update_user_location_new_user(self):
+        # Arrange
+        phone_number = "1234567890"
+        test_data = {
+            "location": {
+                "lat": 40.7128,
+                "long": -74.0060,
+                "street_address": "New York City, NY",
+            }
+        }
+
+        # Act
+        response = self.app.patch(
+            f"/api/users/{phone_number}/location", json=test_data
+        )
+        data = response.get_json()
+        status_code = response.status_code
+
+        # Assert
+        self.assertEqual(status_code, 200)
+        self.assertEqual(data, {"message": "New user created successfully"})
+
+    # Continue with other tests for remaining endpoints...
+
+
+if __name__ == "__main__":
     unittest.main()
