@@ -2,25 +2,23 @@ stages:
   - build
   - test
   - sonar
+  - package
   - deploy
 
-# build-job:
-#   stage: build
-#   environment: dev
-#   tags:
-#     - build
-#     - deploy 
-#   image: docker:20.10.16
-#   services:
-#     - docker:20.10.16-dind
-#   variables:
-#     DOCKER_HOST: tcp://docker:2375
-#     DOCKER_TLS_CERTDIR: ""
-#   before_script:
-#     - docker login -u $REGISTRY_USER -p $REGISTRY_PASS
-#   script:
-#     - echo "Building the image..."
-#     - docker build -t api .
+build:
+  image: python:3.11-bookworm
+  stage: test
+  environment: dev
+  tags:
+    - build
+    - deploy 
+  before_script: 
+    - apt-get update && apt-get install make
+  script:
+    - make venv
+  artifacts:
+    paths:
+      - venv/
 
 
 unit-test-job:
@@ -33,7 +31,7 @@ unit-test-job:
   before_script: 
     - apt-get update && apt-get install make
   script:
-    - make venv && make test
+    - make test
   artifacts:
     paths:
       - coverage.xml
@@ -61,6 +59,24 @@ sonarqube-check:
     - sonar-scanner -X -Dsonar.sources=. -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_LOGIN 
   allow_failure: true
 
+
+build-image:
+  stage: package
+  environment: dev
+  tags:
+    - build
+    - deploy 
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  before_script:
+    - docker login -u $REGISTRY_USER -p $REGISTRY_PASS
+  script:
+    - echo "Building the image..."
+    - docker build -t api .
 
 
 # lint-test-job:
