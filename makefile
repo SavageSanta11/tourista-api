@@ -36,7 +36,8 @@ lint-fix: venv
 	black $(SRC_DIR)
 
 test: venv  ## 🎯 Unit tests for Flask app
-	python test_api.py
+	coverage run -m unittest discover \
+	&& coverage xml
 
 test-report: venv  ## 🎯 Unit tests for Flask app (with report output)
 	. $(SRC_DIR)/.venv/Scripts/activate \
