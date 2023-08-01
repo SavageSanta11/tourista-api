@@ -33,13 +33,16 @@ unit-test-job:
     - apt-get update && apt-get install make
   script:
     - make venv && make test
+  artifacts:
+    paths:
+      - coverage.xml
 
 
 sonarqube-check:
   tags:
     - build
     - deploy
-  stage: test
+  stage: sonar
   image: 
     name: sonarsource/sonar-scanner-cli:latest
     entrypoint: [""]
@@ -52,25 +55,27 @@ sonarqube-check:
     key: "${CI_JOB_NAME}"
     paths:
       - .sonar/cache
+  dependencies:
+    - test
   script: 
     - make venv && make test && sonar-scanner -X -Dsonar.sources=. -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_LOGIN 
   allow_failure: true
 
 
 
-lint-test-job:
-  #image: python:3.11-bookworm
-  stage: test
-  environment: dev
-  tags:
-    - build
-    - deploy 
-  before_script: 
-    - apt-get update && apt-get install make
-  script: 
-    # - make venv && make lint-fix
-    - echo "Lint initiated"
-    - echo "lint complete"
+# lint-test-job:
+#   #image: python:3.11-bookworm
+#   stage: test
+#   environment: dev
+#   tags:
+#     - build
+#     - deploy 
+#   before_script: 
+#     - apt-get update && apt-get install make
+#   script: 
+#     # - make venv && make lint-fix
+#     - echo "Lint initiated"
+#     - echo "lint complete"
 
 deploy-job:
   stage: deploy
