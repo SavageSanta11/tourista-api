@@ -3,3 +3,4 @@ pymongo
 requests==2.31.0
 prometheus-client
 mongomock
+mock
