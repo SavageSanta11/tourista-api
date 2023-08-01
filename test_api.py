@@ -1,17 +1,7 @@
 import unittest
 from unittest.mock import patch
 from app import (
-    get_user_places,
-    update_user_places,
-    get_user_location,
-    update_user_location,
-    remove_topmost_place,
-    remove_place_by_name,
-    get_chat_history,
-    update_chat_history,
-    get_user_interest,
-    store_user_interest,
-    app,
+app
 )
 
 # Import mongomock's MongoClient
