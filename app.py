@@ -261,6 +261,38 @@ def store_user_interest(phone_number):
     else:
         return jsonify({"message": "Invalid data"}), 400
     
+@app.route('/api/users/<phone_number>/language', methods=['GET'])
+def get_user_language(phone_number):
+    # Retrieve existing user data from MongoDB
+    user = collection.find_one({"phone_number": phone_number})
+    if user and 'language' in user and isinstance(user['language'], str):
+        return jsonify({"language": user['language']}), 200
+    else:
+        return jsonify({"message": "User not found or language not available"}), 404
+
+@app.route('/api/users/<phone_number>/language', methods=['POST'])
+def store_user_language(phone_number):
+    data = request.get_json()
+    if 'language' in data and isinstance(data['language'], str):
+        # Retrieve existing user data from MongoDB
+        user = collection.find_one({"phone_number": phone_number})
+        if not user:
+            # If user does not exist, create a new user document with the language
+            new_user = {
+                "phone_number": phone_number,
+                "language": data['language']
+            }
+            collection.insert_one(new_user)
+            return jsonify({"message": "New user created successfully"}), 200
+        else:
+            # If user exists, update the user's language with the new language
+            user['language'] = data['language']
+            # Update user data in MongoDB
+            collection.update_one({"phone_number": phone_number}, {"$set": user})
+            return jsonify({"message": "Language added successfully"}), 200
+    else:
+        return jsonify({"message": "Invalid data"}), 400
+
 
 
 
