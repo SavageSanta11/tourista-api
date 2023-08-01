@@ -52,7 +52,7 @@ sonarqube-check:
   before_script: 
     - apt-get update && apt-get install make
   script: 
-    - make venv && test && sonar-scanner -X -Dsonar.sources=. -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_LOGIN 
+    - make venv && make test && sonar-scanner -X -Dsonar.sources=. -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_LOGIN 
   allow_failure: true
 
 
