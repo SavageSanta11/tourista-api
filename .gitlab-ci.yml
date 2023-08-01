@@ -58,7 +58,7 @@ sonarqube-check:
     paths:
       - .sonar/cache
   dependencies:
-    - test
+    - unit-test-job
   script: 
     - make venv && make test && sonar-scanner -X -Dsonar.sources=. -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_LOGIN 
   allow_failure: true
