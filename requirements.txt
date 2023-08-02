@@ -2,3 +2,5 @@ Flask==2.3.2
 pymongo
 requests==2.31.0
 prometheus-client
+mock
+coverage
