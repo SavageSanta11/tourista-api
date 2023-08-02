@@ -30,8 +30,33 @@ REMOVE_PLACES_REQUEST_TIME = Summary('remove_places_seconds', 'Time spent in REM
 graphs['remove_topmost_place_metric'] = remove_topmost_place_metric
 
 remove_specific_place_metric = Counter('remove_specific_place', 'Remove a Specific Place', ['phone_no'])
-REMOVE__SPEC_PLACE_REQUEST_TIME = Summary('remove_specific_place_seconds', 'Time spent in REMOVE specific user place')
+REMOVE_SPEC_PLACE_REQUEST_TIME = Summary('remove_specific_place_seconds', 'Time spent in REMOVE specific user place')
 graphs['remove_specific_place_metric'] = remove_specific_place_metric
+
+get_chat_history_metric = Counter('get_chat_history', 'Get User Chat History', ['phone_no'])
+GET_CHAT_HISTORY_REQUEST_TIME = Summary('get_chat_history_seconds', 'Time spent in GET user chat history')
+graphs['get_chat_history_metric'] = get_chat_history_metric
+
+update_chat_history_metric = Counter('update_chat_history', 'Update User Chat History', ['phone_no'])
+UPDATE_CHAT_HISTORY_REQUEST_TIME = Summary('update_chat_history_seconds', 'Time spent in PATCH user chat history')
+graphs['update_chat_history_metric'] = update_chat_history_metric
+
+get_user_interest_metric = Counter('get_user_interest', 'Get User Interest', ['phone_no'])
+GET_INTEREST_REQUEST_TIME = Summary('get_user_interest_seconds', 'Time spent in GET user interest')
+graphs['get_user_interest_metric'] = get_user_interest_metric
+
+store_user_interest_metric = Counter('store_user_interest', 'Store User Interest', ['phone_no'])
+STORE_INTEREST_REQUEST_TIME = Summary('store_user_interest_seconds', 'Time spent in POST user interest')
+graphs['store_user_interest_metric'] = store_user_interest_metric
+
+get_user_language_metric = Counter('get_user_language', 'Get User Language', ['phone_no'])
+GET_LANGUAGE_REQUEST_TIME = Summary('get_user_language_seconds', 'Time spent in GET user language')
+graphs['get_user_language_metric'] = get_user_language_metric
+
+store_user_language_metric = Counter('store_user_language', 'Store User Language', ['phone_no'])
+STORE_LANGUAGE_REQUEST_TIME = Summary('store_user_language_seconds', 'Time spent in POST user language')
+graphs['store_user_language_metric'] = store_user_language_metric
+
 
 # root route
 @app.route('/')
@@ -57,7 +82,6 @@ def get_user_places(phone_number):
         get_user_places_metric.labels(phone_no=phone_number).inc()
         graphs['get_user_places_metric'] = get_user_places_metric
         return jsonify({"message": "User not found"}), 404
-
 
 # API endpoint to update all places for a user
 @app.route('/api/users/<phone_number>/places', methods=['PATCH'])
@@ -161,41 +185,8 @@ def remove_topmost_place(phone_number):
         graphs['remove_topmost_place_metric'] = remove_topmost_place_metric
         return jsonify({"message": "No places found for the user or places list is empty"}), 400
 
-@app.route('/api/users/<phone_number>/chat_history', methods=['GET'])
-def get_chat_history(phone_number):
-    # Retrieve existing user data from MongoDB
-    user = collection.find_one({"phone_number": phone_number})
-    if user and 'chat_history' in user:
-        # Return the chat history of the user
-        return jsonify(user['chat_history']), 200
-    else:
-        return jsonify({"message": "User not found or chat history not available"}), 404
-
-@app.route('/api/users/<phone_number>/chat_history', methods=['PATCH'])
-def update_chat_history(phone_number):
-    data = request.get_json()
-    if 'chat_history' in data and isinstance(data['chat_history'], list):
-        # Retrieve existing user data from MongoDB
-        user = collection.find_one({"phone_number": phone_number})
-        if not user:
-            # If user does not exist, create a new user document with the chat history
-            new_user = {
-                "phone_number": phone_number,
-                "chat_history": data['chat_history']
-            }
-            collection.insert_one(new_user)
-            return jsonify({"message": "New user created successfully"}), 200
-        else:
-            # If user exists, update the user's chat history with the new chat history
-            user['chat_history'] = data['chat_history']
-            # Update user data in MongoDB
-            collection.update_one({"phone_number": phone_number}, {"$set": user})
-            return jsonify({"message": "Chat history updated successfully"}), 200
-    else:
-        return jsonify({"message": "Invalid data"}), 400
-
 @app.route('/api/users/<phone_number>/places/remove/<place_name>', methods=['PATCH'])
-@REMOVE__SPEC_PLACE_REQUEST_TIME.time()
+@REMOVE_SPEC_PLACE_REQUEST_TIME.time()
 def remove_place_by_name(phone_number, place_name):
     # Retrieve existing user data from MongoDB
     user = collection.find_one({"phone_number": phone_number})
@@ -230,15 +221,19 @@ def remove_place_by_name(phone_number, place_name):
     return jsonify({"message": f"Place '{place_name}' removed successfully"}), 200
 
 @app.route('/api/users/<phone_number>/interest', methods=['GET'])
+@GET_INTEREST_REQUEST_TIME.time()
 def get_user_interest(phone_number):
     # Retrieve existing user data from MongoDB
     user = collection.find_one({"phone_number": phone_number})
     if user and 'interest' in user and isinstance(user['interest'], str):
+        get_user_interest_metric.labels(phone_no=phone_number).inc()
         return jsonify({"interest": user['interest']}), 200
     else:
+        get_user_interest_metric.labels(phone_no=phone_number).inc()
         return jsonify({"message": "User not found or interest not available"}), 404
 
 @app.route('/api/users/<phone_number>/interest', methods=['POST'])
+@STORE_INTEREST_REQUEST_TIME.time()
 def store_user_interest(phone_number):
     data = request.get_json()
     if 'interest' in data and isinstance(data['interest'], str):
@@ -251,18 +246,101 @@ def store_user_interest(phone_number):
                 "interest": data['interest']
             }
             collection.insert_one(new_user)
+            store_user_interest_metric.labels(phone_no=phone_number).inc()
             return jsonify({"message": "New user created successfully"}), 200
         else:
             # If user exists, update the user's interest with the new interest
             user['interest'] = data['interest']
             # Update user data in MongoDB
             collection.update_one({"phone_number": phone_number}, {"$set": user})
+            store_user_interest_metric.labels(phone_no=phone_number).inc()
             return jsonify({"message": "Interest added successfully"}), 200
     else:
+        store_user_interest_metric.labels(phone_no=phone_number).inc()
         return jsonify({"message": "Invalid data"}), 400
     
+@app.route('/api/users/<phone_number>/chat_history', methods=['GET'])
+@GET_CHAT_HISTORY_REQUEST_TIME.time()
+def get_chat_history(phone_number):
+    # Retrieve existing user data from MongoDB
+    user = collection.find_one({"phone_number": phone_number})
+    if user and 'chat_history' in user:
+        get_chat_history_metric.labels(phone_no=phone_number).inc()
+        return jsonify(user['chat_history']), 200
+    else:
+        get_chat_history_metric.labels(phone_no=phone_number).inc()
+        return jsonify({"message": "User not found or chat history not available"}), 404
 
+@app.route('/api/users/<phone_number>/chat_history', methods=['PATCH'])
+@UPDATE_CHAT_HISTORY_REQUEST_TIME.time()
+def update_chat_history(phone_number):
+    data = request.get_json()
+    if 'chat_history' in data and isinstance(data['chat_history'], list):
+        # Retrieve existing user data from MongoDB
+        user = collection.find_one({"phone_number": phone_number})
+        if not user:
+            # If user does not exist, create a new user document with the chat history
+            new_user = {
+                "phone_number": phone_number,
+                "chat_history": data['chat_history']
+            }
+            collection.insert_one(new_user)
+            update_chat_history_metric.labels(phone_no=phone_number).inc()
+            return jsonify({"message": "New user created successfully"}), 200
+        else:
+            # If user exists, update the user's chat history with the new chat history
+            user['chat_history'] = data['chat_history']
+            # Update user data in MongoDB
+            collection.update_one({"phone_number": phone_number}, {"$set": user})
+            update_chat_history_metric.labels(phone_no=phone_number).inc()
+            return jsonify({"message": "Chat history updated successfully"}), 200
+    else:
+        update_chat_history_metric.labels(phone_no=phone_number).inc()
+        return jsonify({"message": "Invalid data"}), 400
 
+@app.route('/api/users/<phone_number>/language', methods=['GET'])
+@GET_LANGUAGE_REQUEST_TIME.time()
+def get_user_language(phone_number):
+    # Retrieve existing user data from MongoDB
+    user = collection.find_one({"phone_number": phone_number})
+    if user and 'language' in user and isinstance(user['language'], str):
+        get_user_language_metric.labels(phone_no=phone_number).inc()
+        graphs['get_user_language_metric'] = get_user_language_metric
+        return jsonify({"language": user['language']}), 200
+    else:
+        get_user_language_metric.labels(phone_no=phone_number).inc()
+        graphs['get_user_language_metric'] = get_user_language_metric
+        return jsonify({"message": "User not found or language not available"}), 404
+
+@app.route('/api/users/<phone_number>/language', methods=['POST'])
+@STORE_LANGUAGE_REQUEST_TIME.time()
+def store_user_language(phone_number):
+    data = request.get_json()
+    if 'language' in data and isinstance(data['language'], str):
+        # Retrieve existing user data from MongoDB
+        user = collection.find_one({"phone_number": phone_number})
+        if not user:
+            # If user does not exist, create a new user document with the language
+            new_user = {
+                "phone_number": phone_number,
+                "language": data['language']
+            }
+            collection.insert_one(new_user)
+            store_user_language_metric.labels(phone_no=phone_number).inc()
+            graphs['store_user_language_metric'] = store_user_language_metric
+            return jsonify({"message": "New user created successfully"}), 200
+        else:
+            # If user exists, update the user's language with the new language
+            user['language'] = data['language']
+            # Update user data in MongoDB
+            collection.update_one({"phone_number": phone_number}, {"$set": user})
+            store_user_language_metric.labels(phone_no=phone_number).inc()
+            graphs['store_user_language_metric'] = store_user_language_metric
+            return jsonify({"message": "Language added successfully"}), 200
+    else:
+        store_user_language_metric.labels(phone_no=phone_number).inc()
+        graphs['store_user_language_metric'] = store_user_language_metric
+        return jsonify({"message": "Invalid data"}), 400
 
 @app.route("/metrics")
 def requests_count():
